@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OmniraAI — Brand Manager</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#05080f;color:#cfe0f5;}
+input,select,textarea,button{font-family:inherit;}
+::-webkit-scrollbar{width:5px;height:5px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:#1a3055;border-radius:3px;}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/htm@3/dist/htm.js"></script>
+<script>
+const{useState,useEffect}=React;
+const html=htm.bind(React.createElement);
+
+// ── SUPABASE ─────────────────────────────────────────────────
+const SB_URL='https://vchtdsfrryxnvceierkn.supabase.co';
+const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZjaHRkc2Zycnl4bnZjZWllcmtuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg0ODcyMTYsImV4cCI6MjA5NDA2MzIxNn0.VuPuPqCbVYlxNpeTulkKK-IMezzxg3C05c4kWn3evqo';
+const SBH={'apikey':SB_KEY,'Authorization':`Bearer ${SB_KEY}`,'Content-Type':'application/json'};
+const db={
+  async getSetting(k){try{const r=await fetch(`${SB_URL}/rest/v1/settings?key=eq.${k}&select=value`,{headers:SBH});const d=await r.json();return d[0]?.value||null;}catch{return null;}},
+  async setSetting(k,v){try{await fetch(`${SB_URL}/rest/v1/settings`,{method:'POST',headers:{...SBH,'Prefer':'resolution=merge-duplicates'},body:JSON.stringify({key:k,value:v,updated_at:new Date().toISOString()})});}catch(e){console.error(e);}},
+  async getClients(){try{const r=await fetch(`${SB_URL}/rest/v1/clients?select=*&order=created_at.desc`,{headers:SBH});const d=await r.json();return Array.isArray(d)?d.map(x=>x.data):[];}catch{return[];}},
+  async upsertClient(c){try{await fetch(`${SB_URL}/rest/v1/clients`,{method:'POST',headers:{...SBH,'Prefer':'resolution=merge-duplicates'},body:JSON.stringify({id:c.id,updated_at:c.updatedAt,status:c.status,data:c})});}catch(e){console.error(e);}},
+  async deleteClient(id){try{await fetch(`${SB_URL}/rest/v1/clients?id=eq.${id}`,{method:'DELETE',headers:SBH});}catch(e){console.error(e);}},
+};
+
+// ── TOKENS ──────────────────────────────────────────────────
+const C={bg:'#05080f',s1:'#0a1020',s2:'#0e1830',s3:'#13213e',bd:'#17304e',bdB:'#1d4070',ac:'#4a86f5',tx:'#cfe0f5',dm:'#5a8ab0',mt:'#274466',ok:'#34d399',wn:'#fbbf24',er:'#f87171',pu:'#a78bfa',tl:'#2dd4bf'};
+const inp=(ex={})=>({background:C.s2,border:`0.5px solid ${C.bd}`,borderRadius:6,color:C.tx,padding:'8px 11px',fontSize:13,width:'100%',outline:'none',...ex});
+const pbtn=(on,ex={})=>({background:on?C.ac:'transparent',color:on?'#fff':C.tx,border:on?'none':`0.5px solid ${C.bd}`,borderRadius:6,padding:'7px 14px',fontSize:13,cursor:'pointer',...ex});
+
+const INDUSTRIES=['F&B (Food & Beverage)','Beauty & Skincare','Fashion & Apparel','Lifestyle & Wellness','Home & Living','Health & Fitness','E-commerce / Retail','Professional Services','Education & Training','Healthcare & Clinic','Legal & Consulting','Real Estate','Technology & SaaS','Automotive','Travel & Hospitality','Finance & Insurance','Non-profit / NGO','Other'];
+const ARCHETYPES=['The Hero','The Creator','The Caregiver','The Rebel','The Sage','The Explorer','The Ruler','The Magician','The Jester','The Lover','The Everyman','The Innocent'];
+const TONES=['Professional','Friendly','Playful','Bold','Luxurious','Authoritative','Empathetic','Energetic','Inspirational','Educational','Conversational','Witty','Sincere','Minimalist'];
+const PLAT=[{k:'instagram',v:'Instagram'},{k:'tiktok',v:'TikTok'},{k:'facebook',v:'Facebook'},{k:'shopee',v:'Shopee'},{k:'lazada',v:'Lazada'},{k:'linkedin',v:'LinkedIn'},{k:'whatsapp',v:'WhatsApp'},{k:'googleads',v:'Google Ads'},{k:'website',v:'Website/Blog'}];
+const FMTS=['Short-form video','Long-form video','Static image','Carousel/slideshow','Stories','Live stream','Email newsletter','WhatsApp broadcast','Blog article'];
+const FREQS=['Daily','5–6×/week','3–4×/week','1–2×/week','Campaign-based'];
+const AGES=['Under 18','18–24','25–34','35–44','45–54','55–64','65+'];
+const INCOMES=['Below RM1,500/mo','RM1,500–3,000/mo','RM3,000–5,000/mo','RM5,000–8,000/mo','RM8,000–12,000/mo','RM12,000–20,000/mo','RM20,000+/mo'];
+const GENDERS=['Primarily female','Primarily male','All genders','Mixed (female lean)','Mixed (male lean)'];
+const MY_STATES=['Johor','Kedah','Kelantan','Kuala Lumpur (WP)','Labuan (WP)','Melaka','Negeri Sembilan','Pahang','Penang','Perak','Perlis','Putrajaya (WP)','Sabah','Sarawak','Selangor','Terengganu'];
+const SALES_CH=['Online – Own website','Online – Shopee','Online – Lazada','Online – TikTok Shop','Online – Instagram Shop','Offline – Own store','Offline – Retail partner','Wholesale / B2B','Pop-up / Events'];
+const TABS=['Basics','Brand Voice','Audience','Products','Platforms','Messaging'];
+const SCFG={active:{l:'Active',c:C.ok},onboarding:{l:'Onboarding',c:C.wn},paused:{l:'Paused',c:C.mt},deactivated:{l:'Deactivated',c:C.er}};
+const CB=()=>({name:'',email:'',phone:'',role:''});
+const uid=()=>Math.random().toString(36).slice(2,9)+Date.now().toString(36).slice(-4);
+const fmtd=d=>d?new Date(d).toLocaleDateString('en-MY',{day:'numeric',month:'short',year:'numeric'}):'—';
+const blank=()=>({
+  id:uid(),createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),status:'onboarding',
+  basics:{clientName:'',brandName:'',industry:'',industryOther:'',website:'',companyAddress:'',natureOfBusiness:'',productsServicesDesc:'',parentCompany:'',relatedClientTags:[],competitorBrands:[],socialHandles:{instagram:'',tiktok:'',facebook:'',linkedin:'',shopee:'',lazada:''},primaryContact:CB(),secondaryContact:CB(),retainerRM:'',notes:''},
+  voice:{tagline:'',colors:['#4a86f5'],personality:[],archetype:'',tones:[],writingStyle:'',dos:[],donts:[],sampleCopy:'',brandCIUrl:'',sampleCreativeUrls:[]},
+  audience:{description:'',ageRanges:[],gender:'',countryLocation:'Malaysia',malaysiaStates:[],incomeRanges:[],interests:[],painPoints:[],motivations:[],behavior:''},
+  products:[],
+  platforms:{active:[],frequency:'',formats:[]},
+  messaging:{usp:'',keyMessages:[],competitors:[],differentiation:'',cta:''}
+});
+
+// ── STABLE COMPONENTS ────────────────────────────────────────
+function TagInput({tags=[],onAdd,onRemove,placeholder}){
+  const[v,sv]=useState('');
+  return html`<div>
+    ${tags.length>0&&html`<div style=${{display:'flex',flexWrap:'wrap',gap:5,marginBottom:6}}>
+      ${tags.map((t,i)=>html`<span key=${i} style=${{background:C.s3,border:`0.5px solid ${C.bd}`,borderRadius:4,padding:'2px 8px',fontSize:12,color:C.dm,display:'flex',alignItems:'center',gap:4}}>${t}<span onClick=${()=>onRemove(i)} style=${{cursor:'pointer',color:C.mt,fontSize:16,lineHeight:1,marginLeft:2}}>×</span></span>`)}
+    </div>`}
+    <input style=${inp()} value=${v} placeholder=${placeholder||'Type and press Enter'} onChange=${e=>sv(e.target.value)} onKeyDown=${e=>{if((e.key==='Enter'||e.key===',')&&v.trim()){e.preventDefault();onAdd(v.trim());sv('');}if(e.key==='Backspace'&&!v&&tags.length>0)onRemove(tags.length-1);}}/>
+  </div>`;
+}
+function Chips({opts=[],selected=[],onToggle}){
+  return html`<div style=${{display:'flex',flexWrap:'wrap',gap:6}}>
+    ${opts.map(o=>{const k=typeof o==='object'?o.k:o,l=typeof o==='object'?o.v:o,on=selected.includes(k);
+      return html`<button key=${k} onClick=${()=>onToggle(k)} style=${{background:on?C.ac:C.s3,color:on?'#fff':C.dm,border:`0.5px solid ${on?C.ac:C.bd}`,borderRadius:20,padding:'4px 12px',fontSize:12,cursor:'pointer'}}>${l}</button>`;
+    })}
+  </div>`;
+}
+function SBadge({status}){const c=SCFG[status]||SCFG.onboarding;return html`<span style=${{background:`${c.c}1a`,color:c.c,border:`0.5px solid ${c.c}50`,borderRadius:20,padding:'2px 10px',fontSize:11,fontWeight:500,whiteSpace:'nowrap'}}>${c.l}</span>`;}
+function Lb({children}){return html`<div style=${{fontSize:11,color:C.dm,textTransform:'uppercase',letterSpacing:'0.8px',marginBottom:5}}>${children}</div>`;}
+function Fd({label,span2,children}){return html`<div style=${{gridColumn:span2?'span 2':'span 1'}}><${Lb}>${label}</${Lb}>${children}</div>`;}
+function Sec({t,children}){return html`<div style=${{marginBottom:22}}><div style=${{fontSize:11,color:C.ac,textTransform:'uppercase',letterSpacing:'1px',marginBottom:12,paddingBottom:7,borderBottom:`0.5px solid ${C.bd}`}}>${t}</div>${children}</div>`;}
+function Row({l,v}){return v?html`<div style=${{display:'flex',gap:10,marginBottom:7,fontSize:13}}><div style=${{color:C.dm,minWidth:150,flexShrink:0}}>${l}</div><div style=${{color:C.tx,lineHeight:1.5,wordBreak:'break-all'}}>${v}</div></div>`:null;}
+function Tags({items}){return items?.length?html`<div style=${{display:'flex',flexWrap:'wrap',gap:5}}>${items.map((t,i)=>html`<span key=${i} style=${{background:C.s3,border:`0.5px solid ${C.bd}`,borderRadius:4,padding:'2px 9px',fontSize:12,color:C.dm}}>${t}</span>`)}</div>`:html`<span style=${{color:C.mt,fontSize:12}}>Not set</span>`;}
+function Card({style={},children}){return html`<div style=${{background:C.s1,border:`0.5px solid ${C.bd}`,borderRadius:10,...style}}>${children}</div>`;}
+function Hint({children}){return html`<div style=${{fontSize:11,color:C.mt,marginTop:4,lineHeight:1.5}}>${children}</div>`;}
+function Spinner(){return html`<div style=${{display:'flex',alignItems:'center',justifyContent:'center',gap:10,padding:'20px',color:C.dm,fontSize:13}}><div style=${{width:18,height:18,border:`2px solid ${C.bd}`,borderTop:`2px solid ${C.ac}`,borderRadius:'50%',animation:'spin 0.8s linear infinite'}}></div>Loading from Supabase…</div>`;} 
+
+// ── MAIN APP ─────────────────────────────────────────────────
+function App(){
+  const[locked,setLocked]=useState(true);
+  const[pmode,setPmode]=useState('check');
+  const[pin,setPin]=useState('');const[pin2,setPin2]=useState('');
+  const[pErr,setPErr]=useState('');const[savedPin,setSavedPin]=useState(null);
+  const[clients,setClients]=useState([]);
+  const[loading,setLoading]=useState(true);
+  const[view,setView]=useState('dash');
+  const[ed,setEd]=useState(null);
+  const[det,setDet]=useState(null);
+  const[tab,setTab]=useState(0);
+  const[srch,setSrch]=useState('');
+  const[sfilt,setSfilt]=useState('all');
+  const[saving,setSaving]=useState(false);
+  const[copied,setCopied]=useState(false);
+  const[toast,setToast]=useState('');
+
+  useEffect(()=>{(async()=>{
+    const p=await db.getSetting('pin');
+    if(p)setSavedPin(p);else setPmode('create');
+    const cl=await db.getClients();
+    setClients(cl);
+    setLoading(false);
+  })();},[]);
+
+  const showToast=msg=>{setToast(msg);setTimeout(()=>setToast(''),2500);};
+
+  async function persist(list){
+    setClients(list);
+  }
+  async function persistOne(client){
+    await db.upsertClient(client);
+    const cl=await db.getClients();
+    setClients(cl);
+  }
+
+  function doPin(){
+    if(pmode==='create'){if(pin.length<4){setPErr('Min 4 chars');return;}if(pin!==pin2){setPErr('PINs do not match');return;}db.setSetting('pin',pin);setSavedPin(pin);setLocked(false);}
+    else{if(pin===savedPin){setLocked(false);setPErr('');}else{setPErr('Incorrect PIN');setPin('');}}
+  }
+
+  const goBack=()=>{setView('dash');setEd(null);setDet(null);};
+  const startNew=()=>{setEd(blank());setTab(0);setView('form');};
+  const startEdit=c=>{setEd(JSON.parse(JSON.stringify(c)));setTab(0);setView('form');};
+  const openDet=c=>{setDet(c);setView('detail');};
+
+  async function saveEd(){
+    if(!ed.basics.clientName&&!ed.basics.brandName){alert('Please enter a client or brand name.');setTab(0);return;}
+    setSaving(true);
+    const u={...ed,updatedAt:new Date().toISOString()};
+    await db.upsertClient(u);
+    const cl=await db.getClients();
+    setClients(cl);
+    setSaving(false);
+    const isExisting=clients.some(c=>c.id===u.id);
+    showToast(isExisting?'Client brief updated ✓':'New client saved ✓');
+    goBack();
+  }
+
+  async function delClient(id){
+    if(!confirm('Delete this client brief? Cannot be undone.'))return;
+    await db.deleteClient(id);
+    const cl=await db.getClients();
+    setClients(cl);
+    goBack();
+  }
+
+  async function exportAll(){
+    const b=new Blob([JSON.stringify(clients,null,2)],{type:'application/json'});
+    const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download='omniraai-clients-backup.json';a.click();URL.revokeObjectURL(u);
+  }
+
+  const sf=(s,f,v)=>setEd(p=>({...p,[s]:{...p[s],[f]:v}}));
+  const sfC=(w,f,v)=>setEd(p=>({...p,basics:{...p.basics,[w]:{...p.basics[w],[f]:v}}}));
+  const sfH=(f,v)=>setEd(p=>({...p,basics:{...p.basics,socialHandles:{...p.basics.socialHandles,[f]:v}}}));
+  const addTag=(s,f,v)=>{const a=ed[s][f]||[];if(!a.includes(v))sf(s,f,[...a,v]);};
+  const rmTag=(s,f,i)=>{const a=[...(ed[s][f]||[])];a.splice(i,1);sf(s,f,a);};
+  const togArr=(s,f,v)=>{const a=ed[s][f]||[];sf(s,f,a.includes(v)?a.filter(x=>x!==v):[...a,v]);};
+  const addProd=()=>setEd(p=>({...p,products:[...p.products,{id:uid(),name:'',description:'',price:'',usp:'',salesChannels:[],onlineLinks:[],storeLocations:[]}]}));
+  const updProd=(i,f,v)=>{const ps=[...ed.products];ps[i]={...ps[i],[f]:v};setEd(p=>({...p,products:ps}));};
+  const togProd=(i,f,v)=>{const ps=[...ed.products];const a=ps[i][f]||[];ps[i]={...ps[i],[f]:a.includes(v)?a.filter(x=>x!==v):[...a,v]};setEd(p=>({...p,products:ps}));};
+  const addProdTag=(i,f,v)=>{const ps=[...ed.products];const a=ps[i][f]||[];if(!a.includes(v)){ps[i]={...ps[i],[f]:[...a,v]};setEd(p=>({...p,products:ps}));}};
+  const rmProdTag=(i,f,j)=>{const ps=[...ed.products];const a=[...(ps[i][f]||[])];a.splice(j,1);ps[i]={...ps[i],[f]:a};setEd(p=>({...p,products:ps}));};
+  const rmProd=i=>{const ps=[...ed.products];ps.splice(i,1);setEd(p=>({...p,products:ps}));};
+
+  function exportJson(c){return JSON.stringify({
+    client_id:c.id,generated_at:new Date().toISOString(),brand_name:c.basics.brandName||c.basics.clientName,
+    industry:c.basics.industry==='Other'?c.basics.industryOther:c.basics.industry,status:c.status,
+    company:{name:c.basics.clientName,address:c.basics.companyAddress,website:c.basics.website,nature_of_business:c.basics.natureOfBusiness,products_services:c.basics.productsServicesDesc,parent_company:c.basics.parentCompany,related_brands:c.basics.relatedClientTags,social_handles:c.basics.socialHandles},
+    contacts:{primary:c.basics.primaryContact,secondary:c.basics.secondaryContact},
+    brand_brief:{tagline:c.voice.tagline,brand_colors:c.voice.colors,personality:c.voice.personality,archetype:c.voice.archetype,voice_tone:c.voice.tones,writing_style:c.voice.writingStyle,dos:c.voice.dos,donts:c.voice.donts,sample_copy:c.voice.sampleCopy,brand_ci_url:c.voice.brandCIUrl,sample_creative_urls:c.voice.sampleCreativeUrls},
+    target_audience:{description:c.audience.description,age_ranges:c.audience.ageRanges,gender:c.audience.gender,country:c.audience.countryLocation,malaysia_states:c.audience.malaysiaStates,income_ranges:c.audience.incomeRanges,interests:c.audience.interests,pain_points:c.audience.painPoints,motivations:c.audience.motivations,buying_behavior:c.audience.behavior},
+    products:c.products,
+    distribution:{active_platforms:c.platforms.active,posting_frequency:c.platforms.frequency,content_formats:c.platforms.formats},
+    key_messaging:{main_usp:c.messaging.usp,key_messages:c.messaging.keyMessages,competitors:[...(c.basics.competitorBrands||[]),...(c.messaging.competitors||[])],differentiation:c.messaging.differentiation,primary_cta:c.messaging.cta}
+  },null,2);}
+
+  async function copyJson(c){try{await navigator.clipboard.writeText(exportJson(c));setCopied(true);setTimeout(()=>setCopied(false),2500);showToast('JSON copied ✓');}catch{alert('Select and copy the JSON manually.');}}
+
+  const G={display:'grid',gridTemplateColumns:'1fr 1fr',gap:'14px 20px'};
+  const isEditing=ed&&clients.some(c=>c.id===ed.id);
+  const fil=clients.filter(c=>{const n=(c.basics.brandName||c.basics.clientName||'').toLowerCase();return n.includes(srch.toLowerCase())&&(sfilt==='all'||c.status===sfilt);});
+
+  function renderTab(){
+    if(!ed)return null;
+    if(tab===0)return html`<div>
+      <${Sec} t="Business information">
+        <div style=${G}>
+          <${Fd} label="Client / company name"><input style=${inp()} value=${ed.basics.clientName} onChange=${e=>sf('basics','clientName',e.target.value)} placeholder="e.g. FreshBrew Sdn Bhd"/></${Fd}>
+          <${Fd} label="Brand name"><input style=${inp()} value=${ed.basics.brandName} onChange=${e=>sf('basics','brandName',e.target.value)} placeholder="e.g. FreshBrew"/></${Fd}>
+          <${Fd} label="Industry">
+            <select style=${inp()} value=${ed.basics.industry} onChange=${e=>sf('basics','industry',e.target.value)}><option value="">Select…</option>${INDUSTRIES.map(i=>html`<option key=${i} value=${i}>${i}</option>`)}</select>
+            ${ed.basics.industry==='Other'&&html`<input style=${inp({marginTop:8})} value=${ed.basics.industryOther} onChange=${e=>sf('basics','industryOther',e.target.value)} placeholder="Please describe your industry…"/>`}
+          </${Fd}>
+          <${Fd} label="Status"><select style=${inp()} value=${ed.status} onChange=${e=>setEd(p=>({...p,status:e.target.value}))}><option value="onboarding">Onboarding</option><option value="active">Active</option><option value="paused">Paused</option><option value="deactivated">Deactivated</option></select></${Fd}>
+          <${Fd} label="Monthly retainer (RM)"><input style=${inp()} type="number" value=${ed.basics.retainerRM} onChange=${e=>sf('basics','retainerRM',e.target.value)} placeholder="e.g. 3500"/></${Fd}>
+          <${Fd} label="Website"><input style=${inp()} value=${ed.basics.website} onChange=${e=>sf('basics','website',e.target.value)} placeholder="https://…"/></${Fd}>
+          <${Fd} label="Nature of business" span2><textarea style=${inp({resize:'vertical',minHeight:72})} value=${ed.basics.natureOfBusiness} onChange=${e=>sf('basics','natureOfBusiness',e.target.value)} placeholder="Describe what this company does, its business model…"/></${Fd}>
+          <${Fd} label="Products / services / brands overview" span2><textarea style=${inp({resize:'vertical',minHeight:72})} value=${ed.basics.productsServicesDesc} onChange=${e=>sf('basics','productsServicesDesc',e.target.value)} placeholder="Overview of all products, services, or sub-brands…"/></${Fd}>
+          <${Fd} label="Company address" span2><textarea style=${inp({resize:'vertical',minHeight:56})} value=${ed.basics.companyAddress} onChange=${e=>sf('basics','companyAddress',e.target.value)} placeholder="Registered or main operating address…"/></${Fd}>
+        </div>
+      </${Sec}>
+      <${Sec} t="Brand grouping & competitors">
+        <div style=${G}>
+          <${Fd} label="Parent company / holding group"><input style=${inp()} value=${ed.basics.parentCompany} onChange=${e=>sf('basics','parentCompany',e.target.value)} placeholder="e.g. Berjaya Corporation…"/></${Fd}>
+          <${Fd} label="Related brands / sister companies"><${TagInput} tags=${ed.basics.relatedClientTags} onAdd=${v=>addTag('basics','relatedClientTags',v)} onRemove=${i=>rmTag('basics','relatedClientTags',i)} placeholder="e.g. Sub-brand X…"/></${Fd}>
+          <${Fd} label="Competitor brands" span2><${TagInput} tags=${ed.basics.competitorBrands} onAdd=${v=>addTag('basics','competitorBrands',v)} onRemove=${i=>rmTag('basics','competitorBrands',i)} placeholder="e.g. BrandX, CompetitorY…"/></${Fd}>
+        </div>
+      </${Sec}>
+      <${Sec} t="Social media & marketplace handles">
+        <div style=${G}>
+          <${Fd} label="Instagram"><input style=${inp()} value=${ed.basics.socialHandles.instagram} onChange=${e=>sfH('instagram',e.target.value)} placeholder="@username or URL"/></${Fd}>
+          <${Fd} label="TikTok"><input style=${inp()} value=${ed.basics.socialHandles.tiktok} onChange=${e=>sfH('tiktok',e.target.value)} placeholder="@username or URL"/></${Fd}>
+          <${Fd} label="Facebook"><input style=${inp()} value=${ed.basics.socialHandles.facebook} onChange=${e=>sfH('facebook',e.target.value)} placeholder="Page name or URL"/></${Fd}>
+          <${Fd} label="LinkedIn"><input style=${inp()} value=${ed.basics.socialHandles.linkedin} onChange=${e=>sfH('linkedin',e.target.value)} placeholder="Page URL"/></${Fd}>
+          <${Fd} label="Shopee store"><input style=${inp()} value=${ed.basics.socialHandles.shopee} onChange=${e=>sfH('shopee',e.target.value)} placeholder="Shopee store URL"/></${Fd}>
+          <${Fd} label="Lazada store"><input style=${inp()} value=${ed.basics.socialHandles.lazada} onChange=${e=>sfH('lazada',e.target.value)} placeholder="Lazada store URL"/></${Fd}>
+        </div>
+      </${Sec}>
+      <${Sec} t="Primary contact">
+        <div style=${G}>
+          <${Fd} label="Full name"><input style=${inp()} value=${ed.basics.primaryContact.name} onChange=${e=>sfC('primaryContact','name',e.target.value)} placeholder="e.g. Amirul Hakim"/></${Fd}>
+          <${Fd} label="Role / title"><input style=${inp()} value=${ed.basics.primaryContact.role} onChange=${e=>sfC('primaryContact','role',e.target.value)} placeholder="e.g. Founder"/></${Fd}>
+          <${Fd} label="Email"><input style=${inp()} value=${ed.basics.primaryContact.email} onChange=${e=>sfC('primaryContact','email',e.target.value)} placeholder="email@company.com"/></${Fd}>
+          <${Fd} label="Phone"><input style=${inp()} value=${ed.basics.primaryContact.phone} onChange=${e=>sfC('primaryContact','phone',e.target.value)} placeholder="+60 12-XXX XXXX"/></${Fd}>
+        </div>
+      </${Sec}>
+      <${Sec} t="Secondary contact (optional)">
+        <div style=${G}>
+          <${Fd} label="Full name"><input style=${inp()} value=${ed.basics.secondaryContact.name} onChange=${e=>sfC('secondaryContact','name',e.target.value)} placeholder="e.g. Nurul Izzah"/></${Fd}>
+          <${Fd} label="Role / title"><input style=${inp()} value=${ed.basics.secondaryContact.role} onChange=${e=>sfC('secondaryContact','role',e.target.value)} placeholder="e.g. Operations"/></${Fd}>
+          <${Fd} label="Email"><input style=${inp()} value=${ed.basics.secondaryContact.email} onChange=${e=>sfC('secondaryContact','email',e.target.value)} placeholder="email@company.com"/></${Fd}>
+          <${Fd} label="Phone"><input style=${inp()} value=${ed.basics.secondaryContact.phone} onChange=${e=>sfC('secondaryContact','phone',e.target.value)} placeholder="+60 12-XXX XXXX"/></${Fd}>
+        </div>
+      </${Sec}>
+      <${Sec} t="Internal notes"><textarea style=${inp({resize:'vertical',minHeight:80})} value=${ed.basics.notes} onChange=${e=>sf('basics','notes',e.target.value)} placeholder="Private agency notes — not shared with client…"/></${Sec}>
+    </div>`;
+
+    if(tab===1)return html`<div>
+      <${Sec} t="Brand identity">
+        <div style=${G}>
+          <${Fd} label="Brand tagline" span2><input style=${inp()} value=${ed.voice.tagline} onChange=${e=>sf('voice','tagline',e.target.value)} placeholder="e.g. Where every sip tells a story"/></${Fd}>
+          <${Fd} label="Brand archetype"><select style=${inp()} value=${ed.voice.archetype} onChange=${e=>sf('voice','archetype',e.target.value)}><option value="">Select…</option>${ARCHETYPES.map(a=>html`<option key=${a} value=${a}>${a}</option>`)}</select></${Fd}>
+          <${Fd} label="Writing style"><textarea style=${inp({resize:'vertical',minHeight:70})} value=${ed.voice.writingStyle} onChange=${e=>sf('voice','writingStyle',e.target.value)} placeholder="Describe the writing style in 1–2 sentences…"/></${Fd}>
+        </div>
+        <div style=${{marginBottom:16}}>
+          <${Lb}>Brand colors</${Lb}>
+          <div style=${{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
+            ${(ed.voice.colors||[]).map((col,i)=>html`<div key=${i} style=${{display:'flex',alignItems:'center',gap:3}}>
+              <input type="color" value=${col} onChange=${e=>{const c=[...ed.voice.colors];c[i]=e.target.value;sf('voice','colors',c);}} style=${{width:34,height:34,padding:2,border:`1px solid ${C.bd}`,borderRadius:8,cursor:'pointer',background:'transparent'}}/>
+              ${(ed.voice.colors||[]).length>1&&html`<button onClick=${()=>{const c=[...ed.voice.colors];c.splice(i,1);sf('voice','colors',c);}} style=${{background:'none',border:'none',color:C.er,cursor:'pointer',fontSize:18,padding:0}}>×</button>`}
+            </div>`)}
+            ${(ed.voice.colors||[]).length<7&&html`<button onClick=${()=>sf('voice','colors',[...(ed.voice.colors||[]),'#888888'])} style=${pbtn(false,{fontSize:12,padding:'4px 10px'})}>+ Color</button>`}
+          </div>
+        </div>
+        <div style=${{marginBottom:16}}><${Lb}>Voice & tone</${Lb}><${Chips} opts=${TONES} selected=${ed.voice.tones} onToggle=${v=>togArr('voice','tones',v)}/></div>
+        <div style=${G}>
+          <${Fd} label="Personality traits"><${TagInput} tags=${ed.voice.personality} onAdd=${v=>addTag('voice','personality',v)} onRemove=${i=>rmTag('voice','personality',i)} placeholder="e.g. Bold, Approachable…"/></${Fd}>
+          <${Fd} label="Sample approved copy"><textarea style=${inp({resize:'vertical',minHeight:80})} value=${ed.voice.sampleCopy} onChange=${e=>sf('voice','sampleCopy',e.target.value)} placeholder="Paste copy that captures this brand's voice…"/></${Fd}>
+          <${Fd} label="Content do's"><${TagInput} tags=${ed.voice.dos} onAdd=${v=>addTag('voice','dos',v)} onRemove=${i=>rmTag('voice','dos',i)} placeholder="e.g. Use local slang naturally…"/></${Fd}>
+          <${Fd} label="Content don'ts"><${TagInput} tags=${ed.voice.donts} onAdd=${v=>addTag('voice','donts',v)} onRemove=${i=>rmTag('voice','donts',i)} placeholder="e.g. Never name competitors…"/></${Fd}>
+        </div>
+      </${Sec}>
+      <${Sec} t="Brand assets & reference materials">
+        <div style=${G}>
+          <${Fd} label="Brand CI / style guide (Google Drive link)">
+            <input style=${inp()} value=${ed.voice.brandCIUrl} onChange=${e=>sf('voice','brandCIUrl',e.target.value)} placeholder="Paste Google Drive share link…"/>
+            <${Hint}>Upload PDF to Drive → set to "Anyone with link can view" → paste URL here</${Hint}>
+          </${Fd}>
+          <${Fd} label="Sample creatives / ads / brochures (add links)">
+            <${TagInput} tags=${ed.voice.sampleCreativeUrls} onAdd=${v=>addTag('voice','sampleCreativeUrls',v)} onRemove=${i=>rmTag('voice','sampleCreativeUrls',i)} placeholder="Paste Drive link and press Enter…"/>
+            <${Hint}>Add links to past social posts, ad screenshots, brochures</${Hint}>
+          </${Fd}>
+        </div>
+      </${Sec}>
+    </div>`;
+
+    if(tab===2)return html`<div>
+      <${Sec} t="Audience overview"><textarea style=${inp({resize:'vertical',minHeight:85})} value=${ed.audience.description} onChange=${e=>sf('audience','description',e.target.value)} placeholder="Describe the ideal customer — who they are, what they care about, how they buy…"/></${Sec}>
+      <${Sec} t="Demographics">
+        <div style=${{marginBottom:16}}><${Lb}>Age ranges (select all that apply)</${Lb}><${Chips} opts=${AGES} selected=${ed.audience.ageRanges} onToggle=${v=>togArr('audience','ageRanges',v)}/></div>
+        <div style=${G}>
+          <${Fd} label="Gender"><select style=${inp()} value=${ed.audience.gender} onChange=${e=>sf('audience','gender',e.target.value)}><option value="">Select…</option>${GENDERS.map(g=>html`<option key=${g} value=${g}>${g}</option>`)}</select></${Fd}>
+          <${Fd} label="Country / region"><input style=${inp()} value=${ed.audience.countryLocation} onChange=${e=>sf('audience','countryLocation',e.target.value)} placeholder="e.g. Malaysia, Singapore…"/></${Fd}>
+        </div>
+        <div style=${{marginBottom:16}}>
+          <${Lb}>Malaysia states targeted</${Lb}>
+          <${Chips} opts=${MY_STATES} selected=${ed.audience.malaysiaStates} onToggle=${v=>togArr('audience','malaysiaStates',v)}/>
+        </div>
+        <div><${Lb}>Income brackets (select all that apply)</${Lb}><${Chips} opts=${INCOMES} selected=${ed.audience.incomeRanges} onToggle=${v=>togArr('audience','incomeRanges',v)}/></div>
+      </${Sec}>
+      <${Sec} t="Psychographics">
+        <div style=${G}>
+          <${Fd} label="Interests & hobbies"><${TagInput} tags=${ed.audience.interests} onAdd=${v=>addTag('audience','interests',v)} onRemove=${i=>rmTag('audience','interests',i)} placeholder="e.g. Fitness, K-drama…"/></${Fd}>
+          <${Fd} label="Pain points"><${TagInput} tags=${ed.audience.painPoints} onAdd=${v=>addTag('audience','painPoints',v)} onRemove=${i=>rmTag('audience','painPoints',i)} placeholder="e.g. Too busy to cook…"/></${Fd}>
+          <${Fd} label="Motivations"><${TagInput} tags=${ed.audience.motivations} onAdd=${v=>addTag('audience','motivations',v)} onRemove=${i=>rmTag('audience','motivations',i)} placeholder="e.g. Wants to feel confident…"/></${Fd}>
+          <${Fd} label="Buying behaviour"><textarea style=${inp({resize:'vertical',minHeight:80})} value=${ed.audience.behavior} onChange=${e=>sf('audience','behavior',e.target.value)} placeholder="How do they research and decide to buy?"/></${Fd}>
+        </div>
+      </${Sec}>
+    </div>`;
+
+    if(tab===3)return html`<div>
+      <div style=${{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}>
+        <div style=${{fontSize:13,color:C.dm}}>Add all products & services with sales channel info.</div>
+        <button onClick=${addProd} style=${pbtn(false,{fontSize:12,padding:'5px 12px'})}>+ Add Product / Service</button>
+      </div>
+      ${ed.products.length===0?html`<div style=${{textAlign:'center',padding:'40px',border:`1px dashed ${C.bd}`,borderRadius:8,color:C.dm}}><div style=${{fontSize:36,marginBottom:8}}>📦</div><div style=${{marginBottom:12}}>No products yet</div><button onClick=${addProd} style=${pbtn(false,{fontSize:12,padding:'6px 14px'})}>+ Add First Product</button></div>`
+      :ed.products.map((p,i)=>html`
+        <div key=${p.id} style=${{background:C.s2,border:`0.5px solid ${C.bd}`,borderRadius:8,padding:16,marginBottom:12}}>
+          <div style=${{display:'flex',justifyContent:'space-between',marginBottom:10}}><div style=${{fontSize:12,fontWeight:500,color:C.dm}}>Product ${i+1}${p.name?' — '+p.name:''}</div><button onClick=${()=>rmProd(i)} style=${{background:'none',border:'none',color:C.er,cursor:'pointer',fontSize:12}}>✕ Remove</button></div>
+          <div style=${{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px 16px'}}>
+            <div style=${{gridColumn:'span 2'}}><${Lb}>Name</${Lb}><input style=${inp()} value=${p.name} onChange=${e=>updProd(i,'name',e.target.value)} placeholder="e.g. Signature Cold Brew 250ml"/></div>
+            <div style=${{gridColumn:'span 2'}}><${Lb}>Description</${Lb}><textarea style=${inp({resize:'vertical',minHeight:60})} value=${p.description} onChange=${e=>updProd(i,'description',e.target.value)} placeholder="What it is, why people love it…"/></div>
+            <div><${Lb}>Price</${Lb}><input style=${inp()} value=${p.price} onChange=${e=>updProd(i,'price',e.target.value)} placeholder="e.g. RM 15"/></div>
+            <div><${Lb}>USP</${Lb}><input style=${inp()} value=${p.usp} onChange=${e=>updProd(i,'usp',e.target.value)} placeholder="e.g. Only single-origin cold brew in KL"/></div>
+            <div style=${{gridColumn:'span 2'}}><${Lb}>Sales channels</${Lb}><${Chips} opts=${SALES_CH} selected=${p.salesChannels||[]} onToggle=${v=>togProd(i,'salesChannels',v)}/></div>
+            <div style=${{gridColumn:'span 2'}}><${Lb}>Online links</${Lb}><${TagInput} tags=${p.onlineLinks||[]} onAdd=${v=>addProdTag(i,'onlineLinks',v)} onRemove=${j=>rmProdTag(i,'onlineLinks',j)} placeholder="Paste product URL and press Enter…"/></div>
+            <div style=${{gridColumn:'span 2'}}><${Lb}>Physical store locations</${Lb}><${TagInput} tags=${p.storeLocations||[]} onAdd=${v=>addProdTag(i,'storeLocations',v)} onRemove=${j=>rmProdTag(i,'storeLocations',j)} placeholder="e.g. Pavilion KL, Level 3…"/></div>
+          </div>
+        </div>`)}
+    </div>`;
+
+    if(tab===4)return html`<div>
+      <${Sec} t="Active platforms"><${Chips} opts=${PLAT} selected=${ed.platforms.active} onToggle=${v=>togArr('platforms','active',v)}/></${Sec}>
+      <${Sec} t="Posting frequency"><${Chips} opts=${FREQS} selected=${ed.platforms.frequency?[ed.platforms.frequency]:[]} onToggle=${v=>sf('platforms','frequency',ed.platforms.frequency===v?'':v)}/></${Sec}>
+      <${Sec} t="Content formats"><${Chips} opts=${FMTS} selected=${ed.platforms.formats} onToggle=${v=>togArr('platforms','formats',v)}/></${Sec}>
+    </div>`;
+
+    if(tab===5)return html`<div style=${G}>
+      <${Fd} label="Main USP" span2><textarea style=${inp({resize:'vertical',minHeight:80})} value=${ed.messaging.usp} onChange=${e=>sf('messaging','usp',e.target.value)} placeholder="What makes this brand genuinely different?"/></${Fd}>
+      <${Fd} label="Primary CTA"><input style=${inp()} value=${ed.messaging.cta} onChange=${e=>sf('messaging','cta',e.target.value)} placeholder="e.g. Order now on Shopee"/></${Fd}>
+      <${Fd} label="Differentiation"><textarea style=${inp({resize:'vertical',minHeight:80})} value=${ed.messaging.differentiation} onChange=${e=>sf('messaging','differentiation',e.target.value)} placeholder="How does this brand win?"/></${Fd}>
+      <${Fd} label="Key messages"><${TagInput} tags=${ed.messaging.keyMessages} onAdd=${v=>addTag('messaging','keyMessages',v)} onRemove=${i=>rmTag('messaging','keyMessages',i)} placeholder="e.g. 100% natural…"/></${Fd}>
+      <${Fd} label="Additional competitors"><${TagInput} tags=${ed.messaging.competitors} onAdd=${v=>addTag('messaging','competitors',v)} onRemove=${i=>rmTag('messaging','competitors',i)} placeholder="e.g. BrandX…"/></${Fd}>
+    </div>`;
+    return null;
+  }
+
+  // ── PIN ──────────────────────────────────────────────────────
+  if(locked)return html`
+    <div style=${{minHeight:'100vh',background:C.bg,display:'flex',alignItems:'center',justifyContent:'center',padding:24}}>
+      <div style=${{background:C.s1,border:`0.5px solid ${C.bd}`,borderRadius:14,padding:40,width:'100%',maxWidth:360,textAlign:'center'}}>
+        <div style=${{width:60,height:60,borderRadius:16,background:`linear-gradient(135deg,${C.ac},${C.pu})`,display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 20px',fontSize:26,fontWeight:700,color:'#fff'}}>O</div>
+        <div style=${{fontSize:24,fontWeight:700,color:C.tx}}>OmniraAI</div>
+        <div style=${{fontSize:13,color:C.dm,margin:'4px 0 28px'}}>Brand Manager${pmode==='create'?' — Create PIN':''}</div>
+        <input style=${inp({marginBottom:10,textAlign:'center',letterSpacing:6,fontSize:20})} type="password" placeholder=${pmode==='create'?'Create PIN (min 4)':'Enter PIN'} value=${pin} onChange=${e=>setPin(e.target.value)} onKeyDown=${e=>e.key==='Enter'&&(pmode==='check'?doPin():null)} autoFocus/>
+        ${pmode==='create'&&html`<input style=${inp({marginBottom:14,textAlign:'center',letterSpacing:6,fontSize:20})} type="password" placeholder="Confirm PIN" value=${pin2} onChange=${e=>setPin2(e.target.value)} onKeyDown=${e=>e.key==='Enter'&&doPin()}/>`}
+        ${pErr&&html`<div style=${{color:C.er,fontSize:12,marginBottom:12}}>${pErr}</div>`}
+        <button style=${pbtn(true,{width:'100%',padding:'11px 0',fontSize:15})} onClick=${doPin}>${pmode==='create'?'Create PIN & Enter →':'Unlock →'}</button>
+        <div style=${{fontSize:11,color:C.mt,marginTop:16}}>OmniraAI · Powered by Supabase</div>
+      </div>
+    </div>`;
+
+  const isEditing2=ed&&clients.some(c=>c.id===ed.id);
+  const mrr=clients.reduce((s,c)=>s+(parseInt(c.basics?.retainerRM)||0),0);
+
+  const hdr=html`
+    <div style=${{background:C.s1,borderBottom:`1px solid ${C.bd}`,padding:'0 24px',height:54,display:'flex',alignItems:'center',justifyContent:'space-between',position:'sticky',top:0,zIndex:50}}>
+      <div style=${{display:'flex',alignItems:'center',gap:10}}>
+        <div style=${{width:30,height:30,borderRadius:8,background:`linear-gradient(135deg,${C.ac},${C.pu})`,display:'flex',alignItems:'center',justifyContent:'center',fontWeight:700,color:'#fff',fontSize:14}}>O</div>
+        <span style=${{fontSize:15,fontWeight:600,color:C.tx}}>OmniraAI</span>
+        <span style=${{fontSize:12,color:C.mt}}>/ Brand Manager</span>
+        ${view==='form'&&ed&&html`<span style=${{fontSize:12,color:C.mt}}>/ ${isEditing2?'Edit Brief':'New Client'}</span>`}
+        ${view==='detail'&&det&&html`<span style=${{fontSize:12,color:C.mt}}>/ ${det.basics.brandName||det.basics.clientName}</span>`}
+      </div>
+      <div style=${{display:'flex',gap:7,alignItems:'center'}}>
+        ${view!=='dash'&&html`<button onClick=${goBack} style=${pbtn(false,{fontSize:12,padding:'5px 12px'})}>← Back</button>`}
+        ${view==='dash'&&html`
+          <button onClick=${exportAll} style=${pbtn(false,{fontSize:12,padding:'5px 12px'})}>↓ Backup</button>
+          <button onClick=${startNew} style=${pbtn(true,{fontSize:12,padding:'5px 14px'})}>+ New Client</button>`}
+        ${view==='form'&&html`
+          <button onClick=${goBack} style=${pbtn(false,{fontSize:12,padding:'5px 12px'})}>Cancel</button>
+          <button onClick=${saveEd} disabled=${saving} style=${pbtn(true,{fontSize:12,padding:'6px 18px',fontWeight:500})}>${saving?'Saving…':isEditing2?'💾 Update':'💾 Save'}</button>`}
+        ${view==='detail'&&det&&html`
+          <button onClick=${()=>startEdit(det)} style=${pbtn(true,{fontSize:12,padding:'5px 14px'})}>✏️ Edit</button>
+          <button onClick=${()=>delClient(det.id)} style=${pbtn(false,{fontSize:12,padding:'5px 12px',color:C.er,border:`0.5px solid ${C.er}50`})}>Delete</button>`}
+      </div>
+    </div>`;
+
+  const dash=html`
+    <div style=${{padding:'24px',maxWidth:1100,margin:'0 auto'}}>
+      ${loading?html`<${Spinner}/>`:html`<div>
+        <div style=${{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10,marginBottom:22}}>
+          ${[['Total Clients',clients.length,C.tx],['Active',clients.filter(c=>c.status==='active').length,C.ok],['Onboarding',clients.filter(c=>c.status==='onboarding').length,C.wn],['Monthly Retainer',`RM ${mrr.toLocaleString()}`,C.tl]].map(([l,v,c])=>html`
+            <div key=${l} style=${{background:C.s1,border:`0.5px solid ${C.bd}`,borderRadius:8,padding:'13px 16px'}}><div style=${{fontSize:26,fontWeight:600,color:c,lineHeight:1.1}}>${v}</div><div style=${{fontSize:12,color:C.dm,marginTop:3}}>${l}</div></div>`)}
+        </div>
+        <div style=${{display:'flex',gap:8,marginBottom:18,flexWrap:'wrap',alignItems:'center'}}>
+          <input style=${inp({flex:1,minWidth:180})} placeholder="Search brands…" value=${srch} onChange=${e=>setSrch(e.target.value)}/>
+          ${['all','active','onboarding','paused','deactivated'].map(f=>html`<button key=${f} onClick=${()=>setSfilt(f)} style=${{...pbtn(sfilt===f),fontSize:12,padding:'5px 11px',textTransform:'capitalize',background:sfilt===f?C.ac:'transparent'}}>${f}</button>`)}
+        </div>
+        ${fil.length===0?html`
+          <div style=${{textAlign:'center',padding:'60px',color:C.dm}}>
+            <div style=${{fontSize:48,marginBottom:14}}>🏢</div>
+            <div style=${{fontSize:17,color:C.tx,marginBottom:6}}>${clients.length===0?'No clients yet':'No results'}</div>
+            <div style=${{fontSize:13,marginBottom:20}}>${clients.length===0?'Add your first brand brief to get started.':'Try adjusting your filter.'}</div>
+            ${clients.length===0&&html`<button onClick=${startNew} style=${pbtn(true,{padding:'10px 26px',fontSize:14})}>+ Add First Client</button>`}
+          </div>`
+        :html`<div style=${{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(290px,1fr))',gap:12}}>
+            ${fil.map(c=>html`
+              <div key=${c.id} style=${{background:C.s1,border:`0.5px solid ${C.bd}`,borderRadius:10,padding:18,transition:'border-color .15s'}} onMouseEnter=${e=>e.currentTarget.style.borderColor=C.bdB} onMouseLeave=${e=>e.currentTarget.style.borderColor=C.bd}>
+                <div style=${{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:10}}>
+                  <div style=${{flex:1,minWidth:0,marginRight:8,cursor:'pointer'}} onClick=${()=>openDet(c)}>
+                    <div style=${{fontSize:15,fontWeight:600,color:C.tx,marginBottom:2,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>${c.basics.brandName||c.basics.clientName||'Unnamed'}</div>
+                    <div style=${{fontSize:12,color:C.dm,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>${c.basics.industry==='Other'?c.basics.industryOther:c.basics.industry||'No industry'}</div>
+                  </div>
+                  <${SBadge} status=${c.status}/>
+                </div>
+                <div style=${{display:'flex',flexWrap:'wrap',gap:4,marginBottom:10,cursor:'pointer'}} onClick=${()=>openDet(c)}>
+                  ${(c.platforms?.active||[]).slice(0,5).map(p=>html`<span key=${p} style=${{background:C.s3,border:`0.5px solid ${C.bd}`,borderRadius:4,padding:'2px 6px',fontSize:11,color:C.dm}}>${p}</span>`)}
+                </div>
+                <div style=${{display:'flex',alignItems:'center',gap:6}}>
+                  <div style=${{display:'flex',gap:4,cursor:'pointer'}} onClick=${()=>openDet(c)}>
+                    ${(c.voice?.colors||[]).slice(0,5).map((col,i)=>html`<div key=${i} style=${{width:13,height:13,borderRadius:'50%',background:col,border:`1px solid ${C.bd}`,flexShrink:0}}/>`)}
+                  </div>
+                  ${c.basics.retainerRM&&html`<span style=${{fontSize:11,color:C.ok}}>RM ${parseInt(c.basics.retainerRM).toLocaleString()}/mo</span>`}
+                  <div style=${{marginLeft:'auto',display:'flex',gap:6,alignItems:'center'}}>
+                    <button onClick=${()=>startEdit(c)} style=${{background:'none',border:`0.5px solid ${C.bd}`,borderRadius:4,color:C.dm,cursor:'pointer',fontSize:11,padding:'3px 8px'}}>✏️ Edit</button>
+                    <span style=${{fontSize:11,color:C.mt}}>${fmtd(c.updatedAt)}</span>
+                  </div>
+                </div>
+              </div>`)}
+          </div>`}
+      </div>`}
+    </div>`;
+
+  const form=ed&&html`
+    <div style=${{maxWidth:860,margin:'0 auto',padding:'24px'}}>
+      <div style=${{marginBottom:16,display:'flex',justifyContent:'space-between',alignItems:'flex-end',flexWrap:'wrap',gap:10}}>
+        <div><div style=${{fontSize:19,fontWeight:600,color:C.tx}}>${isEditing2?'Edit client brief':'New client brief'}</div><div style=${{fontSize:13,color:C.dm,marginTop:2}}>${ed.basics.brandName||ed.basics.clientName||'Untitled'}</div></div>
+        <button onClick=${saveEd} disabled=${saving} style=${pbtn(true,{fontSize:13,padding:'8px 20px',fontWeight:500})}>${saving?'Saving…':isEditing2?'💾 Update Brief':'💾 Save Brief'}</button>
+      </div>
+      <div style=${{display:'flex',gap:2,marginBottom:22,background:C.s2,padding:4,borderRadius:8,border:`0.5px solid ${C.bd}`}}>
+        ${TABS.map((t,i)=>html`<button key=${t} onClick=${()=>setTab(i)} style=${{flex:1,padding:'7px 3px',fontSize:12,cursor:'pointer',borderRadius:6,border:'none',background:tab===i?C.ac:'transparent',color:tab===i?'#fff':C.dm,fontWeight:tab===i?500:400}}>${t}</button>`)}
+      </div>
+      <div style=${{background:C.s1,border:`0.5px solid ${C.bd}`,borderRadius:10,padding:24,marginBottom:16}}>${renderTab()}</div>
+      <div style=${{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+        <button onClick=${()=>setTab(t=>Math.max(0,t-1))} disabled=${tab===0} style=${pbtn(false,{opacity:tab===0?.3:1})}>← Previous</button>
+        <span style=${{fontSize:12,color:C.mt}}>${tab+1} of ${TABS.length}</span>
+        ${tab<TABS.length-1?html`<button onClick=${()=>setTab(t=>t+1)} style=${pbtn(true)}>Next →</button>`:html`<button onClick=${saveEd} disabled=${saving} style=${pbtn(true,{padding:'8px 22px',fontWeight:500})}>${saving?'Saving…':isEditing2?'💾 Update':'💾 Save'}</button>`}
+      </div>
+    </div>`;
+
+  const detail=det&&html`
+    <div style=${{maxWidth:920,margin:'0 auto',padding:'24px'}}>
+      <div style=${{background:C.s1,border:`0.5px solid ${C.bd}`,borderRadius:10,padding:20,marginBottom:14,display:'flex',alignItems:'center',gap:16}}>
+        <div style=${{width:56,height:56,borderRadius:14,background:`linear-gradient(135deg,${(det.voice?.colors||['#4a86f5'])[0]},${(det.voice?.colors||[])[1]||C.pu})`,flexShrink:0}}/>
+        <div style=${{flex:1}}><div style=${{fontSize:22,fontWeight:700,color:C.tx}}>${det.basics.brandName||det.basics.clientName}</div><div style=${{fontSize:13,color:C.dm,marginTop:2}}>${det.basics.industry==='Other'?det.basics.industryOther:det.basics.industry}</div></div>
+        <div style=${{textAlign:'right'}}><${SBadge} status=${det.status}/>${det.basics.retainerRM&&html`<div style=${{fontSize:13,color:C.ok,marginTop:5}}>RM ${parseInt(det.basics.retainerRM).toLocaleString()}/mo</div>`}<div style=${{fontSize:11,color:C.mt,marginTop:4}}>Updated ${fmtd(det.updatedAt)}</div></div>
+      </div>
+      <div style=${{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14,marginBottom:14}}>
+        <div style=${{background:C.s1,border:`0.5px solid ${C.bd}`,borderRadius:10,padding:18}}>
+          <${Sec} t="Contacts"><${Row} l="Primary" v=${det.basics.primaryContact?.name}/><${Row} l="Email" v=${det.basics.primaryContact?.email}/><${Row} l="Phone" v=${det.basics.primaryContact?.phone}/><${Row} l="Website" v=${det.basics.website}/></${Sec}>
+          <${Sec} t="Brand identity"><${Row} l="Tagline" v=${det.voice.tagline}/><${Row} l="Archetype" v=${det.voice.archetype}/><div style=${{display:'flex',gap:5,marginTop:6}}>${(det.voice.colors||[]).map((c,i)=>html`<div key=${i} style=${{width:22,height:22,borderRadius:6,background:c,border:`1px solid ${C.bd}`}}/>`)}</div></${Sec}>
+        </div>
+        <div style=${{background:C.s1,border:`0.5px solid ${C.bd}`,borderRadius:10,padding:18}}>
+          <${Sec} t="Voice & tone"><div style=${{marginBottom:8}}><div style=${{color:C.dm,fontSize:12,marginBottom:4}}>Tone</div><${Tags} items=${det.voice.tones}/></div><div style=${{marginBottom:8}}><div style=${{color:C.dm,fontSize:12,marginBottom:4}}>Personality</div><${Tags} items=${det.voice.personality}/></div><${Row} l="Archetype" v=${det.voice.archetype}/></${Sec}>
+          <${Sec} t="Target audience"><div style=${{marginBottom:8}}><div style=${{color:C.dm,fontSize:12,marginBottom:4}}>Age ranges</div><${Tags} items=${det.audience.ageRanges}/></div><${Row} l="Location" v=${det.audience.countryLocation}/><div style=${{marginBottom:8}}><div style=${{color:C.dm,fontSize:12,marginBottom:4}}>Income</div><${Tags} items=${det.audience.incomeRanges}/></div></${Sec}>
+        </div>
+      </div>
+      <div style=${{background:C.s1,border:`0.5px solid ${C.ac}35`,borderRadius:10,padding:20,background:`${C.ac}06`}}>
+        <div style=${{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
+          <div><div style=${{fontSize:14,fontWeight:600,color:C.tx,marginBottom:3}}>n8n JSON Export</div><div style=${{fontSize:12,color:C.dm}}>Client ID: <code style=${{background:C.s3,padding:'1px 6px',borderRadius:3,color:C.ac,fontSize:11}}>${det.id}</code></div></div>
+          <button onClick=${()=>copyJson(det)} style=${pbtn(true,{fontSize:12,padding:'6px 14px'})}>${copied?'✓ Copied!':'Copy JSON'}</button>
+        </div>
+        <div style=${{background:C.bg,border:`0.5px solid ${C.bd}`,borderRadius:6,padding:14,maxHeight:200,overflowY:'auto'}}><pre style=${{margin:0,fontSize:11,color:C.dm,fontFamily:'monospace',lineHeight:1.7,whiteSpace:'pre-wrap',wordBreak:'break-word'}}>${exportJson(det)}</pre></div>
+      </div>
+    </div>`;
+
+  return html`
+    <div style=${{minHeight:'100vh',background:C.bg,color:C.tx}}>
+      <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+      ${hdr}
+      <div style=${{paddingBottom:48}}>${view==='dash'&&dash}${view==='form'&&form}${view==='detail'&&detail}</div>
+      ${toast&&html`<div style=${{position:'fixed',bottom:24,right:24,background:C.s1,border:`1px solid ${C.ac}50`,borderRadius:8,padding:'10px 18px',fontSize:13,color:C.tx,zIndex:999}}>${toast}</div>`}
+    </div>`;
+}
+ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
+</script>
+</body>
+</html>
