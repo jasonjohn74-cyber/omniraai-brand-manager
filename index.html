@@ -288,6 +288,28 @@ function App(){
           </${Fd}>
         </div>
       </${Sec}>
+      <${Sec} t="Email Kit — reusable email components" sub="Saved once per client. The App 2 Email Composer auto-loads these so footers, banners and standard buttons never need recreating.">
+        <div style=${G}>
+          <${Fd} label="Default email footer / sign-off" span2>
+            <textarea style=${inp({resize:'vertical',minHeight:80,fontSize:12,lineHeight:1.6})} value=${(ed.emailKit||{}).footer||''} onChange=${e=>sf('emailKit','footer',e.target.value)} placeholder="— The Team, web · IG · FB · contact links, why the recipient is getting this email"/>
+          </${Fd}>
+          <${Fd} label="Default banner image URL" span2>
+            <input style=${inp()} value=${(ed.emailKit||{}).bannerUrl||''} onChange=${e=>sf('emailKit','bannerUrl',e.target.value)} placeholder="https://… (header image used at top of emails)"/>
+          </${Fd}>
+        </div>
+        <div style=${{marginTop:4}}>
+          <${Lb}>Standard CTA buttons</${Lb}>
+          ${(((ed.emailKit||{}).ctas)||[]).map((c,i)=>html`<div key=${i} style=${{border:`0.5px solid ${C.bd}`,borderRadius:8,padding:10,marginBottom:8}}>
+            <div style=${{display:'grid',gridTemplateColumns:'1fr 1.6fr auto',gap:8,alignItems:'center',marginBottom:8}}>
+              <input style=${inp()} value=${c.label||''} onChange=${e=>{const a=[...(((ed.emailKit||{}).ctas)||[])];a[i]={...a[i],label:e.target.value};sf('emailKit','ctas',a);}} placeholder="Button label e.g. Book Now"/>
+              <input style=${inp()} value=${c.url||''} onChange=${e=>{const a=[...(((ed.emailKit||{}).ctas)||[])];a[i]={...a[i],url:e.target.value};sf('emailKit','ctas',a);}} placeholder="https://… link"/>
+              <button onClick=${()=>{const a=[...(((ed.emailKit||{}).ctas)||[])];a.splice(i,1);sf('emailKit','ctas',a);}} style=${{background:'none',border:'none',color:C.er,cursor:'pointer',fontSize:18}}>×</button>
+            </div>
+            <input style=${inp({fontSize:12})} value=${c.desc||''} onChange=${e=>{const a=[...(((ed.emailKit||{}).ctas)||[])];a[i]={...a[i],desc:e.target.value};sf('emailKit','ctas',a);}} placeholder="Optional guide text shown above this button in the email"/>
+          </div>`)}
+          <button onClick=${()=>sf('emailKit','ctas',[...(((ed.emailKit||{}).ctas)||[]),{label:'',url:'',desc:''}])} style=${pbtn(false,{fontSize:12,padding:'4px 12px'})}>+ Add standard button</button>
+        </div>
+      </${Sec}>
     </div>`;
 
     if(tab===2)return html`<div>
