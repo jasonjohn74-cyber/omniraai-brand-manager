@@ -66,6 +66,7 @@ const blankBrand=()=>({
   audience:{description:'',ageRanges:[],gender:'',country:'Malaysia',malaysiaStates:[],incomeRanges:[],interests:[],painPoints:[],motivations:[],behavior:''},
   messaging:{usp:'',keyMessages:[],differentiation:'',cta:'',competitors:[],proofPoints:[]},
   platforms:{active:[],frequency:'',formats:[]},
+  basics:{natureOfBusiness:'',productsServicesDesc:''},
   emailKit:{footer:'',bannerUrl:'',ctas:[]},
   refs:{brandCIUrl:'',sampleCreativeUrls:[]},
   products:[]
@@ -90,6 +91,7 @@ function migrate(c){
     audience:{description:a.description||'',ageRanges:a.ageRanges||[],gender:a.gender||'',country:a.countryLocation||a.country||'Malaysia',malaysiaStates:a.malaysiaStates||[],incomeRanges:a.incomeRanges||[],interests:a.interests||[],painPoints:a.painPoints||[],motivations:a.motivations||[],behavior:a.behavior||''},
     messaging:{usp:m.usp||'',keyMessages:m.keyMessages||[],differentiation:m.differentiation||'',cta:m.cta||'',competitors:[...(b.competitorBrands||[]),...(m.competitors||[])],proofPoints:[]},
     platforms:{active:p.active||[],frequency:p.frequency||'',formats:p.formats||[]},
+    basics:{natureOfBusiness:b.natureOfBusiness||'',productsServicesDesc:b.productsServicesDesc||''},
     emailKit:c.emailKit||{footer:'',bannerUrl:'',ctas:[]},
     refs:{brandCIUrl:v.brandCIUrl||'',sampleCreativeUrls:v.sampleCreativeUrls||[]},
     products:(c.products||[]).map(pr=>Object.assign(blankProduct(),pr))
@@ -240,7 +242,7 @@ function App(){
       client_id:cid,client_code:c.code,brand_id:b.brandId,brand_code:b.code,generated_at:now(),
       client:{legal_name:c.client.legalName,display_name:c.client.displayName,parent_company:c.client.parentCompany},
       brand:{name:b.brandName,industry:b.industry==='Other'?b.industryOther:b.industry,website:b.website,tagline:b.tagline,logo_url:b.logoUrl,social_handles:b.socialHandles,
-        voice:b.voice,audience:b.audience,messaging:b.messaging,platforms:b.platforms,email_kit:b.emailKit,refs:b.refs},
+        voice:b.voice,audience:b.audience,messaging:b.messaging,platforms:b.platforms,nature_of_business:(b.basics||{}).natureOfBusiness||'',products_services:(b.basics||{}).productsServicesDesc||'',email_kit:b.emailKit,refs:b.refs},
       products:b.products
     },null,2);
   }
@@ -418,6 +420,12 @@ function App(){
           <${Fd} label="Logo URL" span2 hint="Direct image link (used on generated creatives)"><input style=${inp()} value=${b.logoUrl} onChange=${e=>sbTop('logoUrl',e.target.value)} placeholder="https://…/logo.png"/></${Fd}>
         </div>
       </${Sec}>
+      <${Sec} t="Business overview">
+        <div style=${G}>
+          <${Fd} label="Nature of business" span2><textarea style=${inp({resize:'vertical',minHeight:72})} value=${(b.basics||{}).natureOfBusiness||''} onChange=${e=>sbf('basics','natureOfBusiness',e.target.value)} placeholder="Describe what this company does, its business model…"/></${Fd}>
+          <${Fd} label="Products / services description" span2><textarea style=${inp({resize:'vertical',minHeight:72})} value=${(b.basics||{}).productsServicesDesc||''} onChange=${e=>sbf('basics','productsServicesDesc',e.target.value)} placeholder="Summarise the products/services offered…"/></${Fd}>
+        </div>
+      </${Sec}>
       <${Sec} t="Social & marketplace handles">
         <div style=${G}>${PLAT_KEYS.map(k=>html`<${Fd} key=${k} label=${k}><input style=${inp()} value=${b.socialHandles[k]||''} onChange=${e=>sbH(k,e.target.value)} placeholder="@username or URL"/></${Fd}>`)}</div>
       </${Sec}></div>`;
@@ -443,6 +451,25 @@ function App(){
         <div style=${G}>
           <${Fd} label="Brand CI / style guide (link)" hint="Google Drive share link"><input style=${inp()} value=${b.refs.brandCIUrl} onChange=${e=>sbf('refs','brandCIUrl',e.target.value)} placeholder="Paste Drive link…"/></${Fd}>
           <${Fd} label="Sample creatives (links)"><${TagInput} tags=${b.refs.sampleCreativeUrls} onAdd=${v=>sbAddTag('refs','sampleCreativeUrls',v)} onRemove=${i=>sbRmTag('refs','sampleCreativeUrls',i)} placeholder="Paste link, press Enter…"/></${Fd}>
+        </div>
+      </${Sec}>
+      <${Sec} t="Email Kit — reusable email components">
+        <div style=${{fontSize:11,color:C.mt,marginBottom:12,lineHeight:1.5}}>Saved once per brand. App 2's Email Composer auto-loads these so footers, banners and standard buttons never need recreating.</div>
+        <div style=${G}>
+          <${Fd} label="Default email footer / sign-off" span2><textarea style=${inp({resize:'vertical',minHeight:80,fontSize:12,lineHeight:1.6})} value=${(b.emailKit||{}).footer||''} onChange=${e=>sbf('emailKit','footer',e.target.value)} placeholder="— The Team, web · IG · FB · contact links, why the recipient is getting this email"/></${Fd}>
+          <${Fd} label="Default banner image URL" span2><input style=${inp()} value=${(b.emailKit||{}).bannerUrl||''} onChange=${e=>sbf('emailKit','bannerUrl',e.target.value)} placeholder="https://… (header image used at top of emails)"/></${Fd}>
+        </div>
+        <div style=${{marginTop:4}}>
+          <${Lb}>Standard CTA buttons</${Lb}>
+          ${(((b.emailKit||{}).ctas)||[]).map((c,i)=>html`<div key=${i} style=${{border:`0.5px solid ${C.bd}`,borderRadius:8,padding:10,marginBottom:8}}>
+            <div style=${{display:'grid',gridTemplateColumns:'1fr 1.6fr auto',gap:8,alignItems:'center',marginBottom:8}}>
+              <input style=${inp()} value=${c.label||''} onChange=${e=>{const a=[...(((b.emailKit||{}).ctas)||[])];a[i]={...a[i],label:e.target.value};sbf('emailKit','ctas',a);}} placeholder="Button label e.g. Book Now"/>
+              <input style=${inp()} value=${c.url||''} onChange=${e=>{const a=[...(((b.emailKit||{}).ctas)||[])];a[i]={...a[i],url:e.target.value};sbf('emailKit','ctas',a);}} placeholder="https://… link"/>
+              <button onClick=${()=>{const a=[...(((b.emailKit||{}).ctas)||[])];a.splice(i,1);sbf('emailKit','ctas',a);}} style=${{background:'none',border:'none',color:C.er,cursor:'pointer',fontSize:18}}>×</button>
+            </div>
+            <input style=${inp({fontSize:12})} value=${c.desc||''} onChange=${e=>{const a=[...(((b.emailKit||{}).ctas)||[])];a[i]={...a[i],desc:e.target.value};sbf('emailKit','ctas',a);}} placeholder="Optional guide text shown above this button in the email"/>
+          </div>`)}
+          <button onClick=${()=>sbf('emailKit','ctas',[...(((b.emailKit||{}).ctas)||[]),{label:'',url:'',desc:''}])} style=${pbtn(false,{fontSize:12,padding:'4px 12px'})}>+ Add standard button</button>
         </div>
       </${Sec}></div>`;
     if(tab===2)return html`<div>
